@@ -1,0 +1,82 @@
+---
+title: "Machine Learning Course Project"
+author: "Marcel Mos"
+date: "22 Sep 2015"
+output: html_document
+---
+
+## Introduction
+
+## Loading data and cleaning of data
+
+First the data is loaded and the following is done:
+
+1. Some variables only contain values if a new window is started. These columns are not good predictors as they are not present for most rows and are eliminated from the data set.
+2. The training set is split in a training and validation set with a 70/30 ratio
+
+```{r echo=TRUE}
+library(caret)
+library(kernlab)
+#repeatability
+set.seed(32599)
+data <- read.csv('pml-training.csv', na.strings=c("", "NA", "#DIV/0!"))
+
+#remove variables that are only populated for new windows
+countisnas <- colSums(is.na(data))
+data <- data[,countisnas==0]
+#first 7 variables are removed (names, dates, window numbers)
+data <- data[,8:dim(data)[2]]
+
+#split the data set in a training and validation set
+val <- createDataPartition(y=data$classe, p=0.70, list=FALSE)
+validation <- data[val,]
+training <- data[-val,]
+```
+
+## Model Selection
+
+The problem at hand is a classification problem. Based on a number of numeric variables an acitivity has to be classified, with 5 possible classes as outcome. 
+
+Models that will be considered are recursive partitioning and random forest. These models will be fitted using 5-fold cross validation. The best model will be tested on the validation set. 
+
+### cross validation
+The train function from the 'caret' package will be used to train the models. The control parameters are set globally. The parameter used is 5-fold cross validation
+
+```{r echo=TRUE}
+tc <- trainControl(method="cv", number = 5)
+```
+
+### Recursive partitioning
+The first model tried is recursive partitioning:
+
+```{r echo=TRUE}
+fit.rpart <- train(classe ~ ., data=training, method="rpart", trControl=tc)
+fit.rpart
+
+```
+
+The table above shows an accuracy for the best model of 0.497 or an out of sample error rate of 50.3%. Recursive partitioning does not look as a promising candidate. 
+
+### Random Forest
+The second model tried is random forest:
+
+```{r echo=TRUE}
+fit.rf <- train(classe ~ ., data=training, method="rf", trControl=tc)
+fit.rf$finalModel
+```
+
+The table above shows a better out of sample error rate of 1.73%. Random forest is preferable as model. 
+
+### Out of Sample Error Rate
+Using cross-validation as done above delivers an out of sample error rate of 1.73%. We have reserved 30% of our training set for final validation. 
+
+Applying the trained model to the validation set will verify the estimation of the error rate:
+
+```{r echo=TRUE}
+preds.rf <- predict(fit.rf, validation)
+confusionMatrix(preds.rf, validation$classe)
+```
+The table above verifies the accuracy, The validated out of sample error rate is 1-0.9803= 1.97%. This is significantly close. 
+
+
+
